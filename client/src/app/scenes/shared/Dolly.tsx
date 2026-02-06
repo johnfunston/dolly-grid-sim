@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { Box3, Vector3 } from "three";
 import type { Group } from "three";
+import { SkeletonUtils } from "three-stdlib";
 
 import type { GridConfig, Tile, Vec3 } from "../../world/grid/gridTypes";
 import { tileToWorldCenter } from "../../world/grid/gridMath";
@@ -59,24 +60,24 @@ export default function Dolly({
   const traveledRef = useRef(0);
 
   const gltf = useGLTF(DOLLY_URL);
+const model = useMemo(() => SkeletonUtils.clone(gltf.scene) as Group, [gltf.scene]);
 
-  const { modelScale, modelOffset } = useMemo(() => {
-    const box = new Box3().setFromObject(gltf.scene);
-    const size = new Vector3();
-    const center = new Vector3();
-    box.getSize(size);
-    box.getCenter(center);
+const { modelScale, modelOffset } = useMemo(() => {
+  const box = new Box3().setFromObject(model);
+  const size = new Vector3();
+  const center = new Vector3();
+  box.getSize(size);
+  box.getCenter(center);
 
-    const targetFootprint = 0.62;
-    const sx = size.x > 0 ? targetFootprint / size.x : 1;
-    const sz = size.z > 0 ? targetFootprint / size.z : 1;
-    const scale = Math.min(sx, sz);
+  const targetFootprint = 0.62;
+  const sx = size.x > 0 ? targetFootprint / size.x : 1;
+  const sz = size.z > 0 ? targetFootprint / size.z : 1;
+  const scale = Math.min(sx, sz);
 
-    // Center XZ and ground to y=0 (in local space)
-    const offset: [number, number, number] = [-center.x, -box.min.y, -center.z];
+  const offset: [number, number, number] = [-center.x, -box.min.y, -center.z];
+  return { modelScale: scale, modelOffset: offset };
+}, [model]);
 
-    return { modelScale: scale, modelOffset: offset };
-  }, [gltf.scene]);
 
   const points = useMemo<Pt[]>(() => {
     if (path.length < 1) return [];
@@ -203,7 +204,8 @@ export default function Dolly({
     <group ref={dollyRef}>
       {/* Scale is applied in useFrame to avoid reading refs in render */}
       <group ref={modelGroupRef}>
-        <primitive object={gltf.scene} position={modelOffset} />
+        <primitive object={model} position={modelOffset} dispose={null} />
+
       </group>
     </group>
   );

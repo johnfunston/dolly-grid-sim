@@ -15,7 +15,7 @@ import HoverHighlight from "./shared/HoverHighlight";
 import HoverTileControls from "./shared/HoverTileControls";
 import type { HoverIntent } from "../world/sim/commands";
 import { Environment } from "@react-three/drei";
-import "../styles/SimViewCanvas.css";
+import "../styles/globals.css";
 
 import LiftedTower from "./shared/LiftedTower";
 import { tileToWorldCenter } from "../world/grid/gridMath";
@@ -127,7 +127,9 @@ type SimViewCanvasProps = {
   hoverPath: readonly Tile[];
 
   onHoverIntent: (intent: HoverIntent) => void;
+  activeView: "SIM" | "WORLD";
 };
+
 
 export default function SimViewCanvas({
   grid,
@@ -145,7 +147,9 @@ export default function SimViewCanvas({
   isMoving,
   queueLen,
   onHoverIntent,
+  activeView,
 }: SimViewCanvasProps) {
+const isActive = activeView === "SIM";
   const actionsDisabled = isMoving || queueLen > 0;
   const isCarrying = !!carrying;
 
@@ -162,7 +166,7 @@ export default function SimViewCanvas({
   const liftOffsetY = useMemo(() => grid.tileSize - 0.9, [grid.tileSize]);
 
   return (
-    <div className="sim-view-canvas-container">
+    <div className={activeView === "SIM" ? "active-view-canvas-container" : "inactive-view-canvas-container"}>
       <Canvas
         camera={{
           // initial seed only (BirdsEyeChaseCamera drives it each frame)
@@ -178,7 +182,7 @@ export default function SimViewCanvas({
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} castShadow />
         <directionalLight position={[-5, 4, -5]} intensity={0.6} />
-        <Environment preset="warehouse" backgroundBlurriness={3} />
+        <Environment preset="apartment" backgroundBlurriness={3} />
 
         <Floor grid={grid} />
         <PathLine grid={grid} path={hoverPath} yOffset={grid.tileSize * 0.26} />
@@ -205,31 +209,38 @@ export default function SimViewCanvas({
             offsetZ={0.1}
           />
         )}
+        {isActive && (
+        <>
+            <HoverHighlight grid={grid} tile={hoveredTile} />
 
-        <HoverHighlight grid={grid} tile={hoveredTile} />
+            {/* Hover + click picking */}
+            <TilePickerGrid
+            grid={grid}
+            onHover={onTileHover}
+            onClick={onTileClick}
+            />
 
-        {/* Tile hover + click picking (MOVE/DROP targets) */}
-        <TilePickerGrid grid={grid} onHover={onTileHover} onClick={onTileClick} />
+            {/* MOVE/DROP */}
+            <HoverTileControls
+            grid={grid}
+            hoveredTile={hoveredTile}
+            towerTiles={towers}
+            isCarrying={isCarrying}
+            disabled={actionsDisabled}
+            onIntent={onHoverIntent}
+            />
 
-        {/* Tile overlay controls (MOVE/DROP only) */}
-        <HoverTileControls
-          grid={grid}
-          hoveredTile={hoveredTile}
-          towerTiles={towers}
-          isCarrying={isCarrying}
-          disabled={actionsDisabled}
-          onIntent={onHoverIntent}
-        />
-
-        {/* Tower overlay controls (LIFT/SWAP only) */}
-        <HoverTowerControls
-          grid={grid}
-          hoveredTowerTile={hoveredTowerTile}
-          isCarrying={isCarrying}
-          carryingTile={carrying}
-          disabled={actionsDisabled}
-          onIntent={onHoverIntent}
-        />
+            {/* LIFT/SWAP */}
+            <HoverTowerControls
+            grid={grid}
+            hoveredTowerTile={hoveredTowerTile}
+            isCarrying={isCarrying}
+            carryingTile={carrying}
+            disabled={actionsDisabled}
+            onIntent={onHoverIntent}
+            />
+        </>
+        )}
 
         <Dolly
           grid={grid}

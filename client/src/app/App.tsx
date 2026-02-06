@@ -6,19 +6,25 @@ import { generateTowerTiles, buildTowerSet } from "./world/towers/towerLocations
 import { buildBaseEdges } from "./world/pathfinding/neighbors";
 import { buildPrunedAdjacency } from "./world/grid/gridRules";
 import { bfsPath } from "./world/pathfinding/bfs";
+
 import SimViewCanvas from "./scenes/SimViewCanvas";
-import HudPanel from './ui/HudPanel';
 import WorldViewCanvas from "./scenes/WorldViewCanvas";
+import HudPanel from "./ui/HudPanel";
 
 import type { Command, HoverIntent } from "./world/sim/commands";
 import { CMD } from "./world/sim/commands";
 import { expandSwap } from "./world/sim/expandSwap";
-import './styles/globals.css';
+
+import "./styles/globals.css";
+
+type ActiveView = "SIM" | "WORLD";
 
 function App() {
   const grid = DEFAULT_GRID;
   const speed = 2;
 
+  // ✅ NEW: which canvas is primary
+  const [activeView, setActiveView] = useState<ActiveView>("SIM");
   const [dollyTile, setDollyTile] = useState<Tile>({ x: 7, z: 5 });
   const [path, setPath] = useState<Tile[]>([]);
   const [hoveredTile, setHoveredTile] = useState<Tile | null>(null);
@@ -222,7 +228,6 @@ function App() {
         return;
       }
 
-      // ✅ IMPORTANT: update refs synchronously (do NOT wait for React updater callbacks)
       const nextTowers = towerList.filter((t) => !tileEquals(t, target));
       towersRef.current = nextTowers;
       setTowers(nextTowers);
@@ -230,7 +235,6 @@ function App() {
       carryingRef.current = target;
       setCarrying(target);
 
-      // refresh immediately so next MOVE_TO uses correct graphs
       refreshRuntimeGraphs();
 
       popHead();
@@ -262,7 +266,6 @@ function App() {
         return;
       }
 
-      // ✅ sync ref update
       const nextTowers = [...towerList, target];
       towersRef.current = nextTowers;
       setTowers(nextTowers);
@@ -290,10 +293,9 @@ function App() {
   }, []);
 
   const handleTowerHover = useCallback((tile: Tile | null) => {
-  setHoveredTowerTile(tile);
-  setHoveredTile(tile); // ✅ ensure hoverPath updates so PathLine shows
-}, []);
-
+    setHoveredTowerTile(tile);
+    setHoveredTile(tile); // ensure hoverPath updates so PathLine shows
+  }, []);
 
   const handleTileClick = useCallback(
     (tile: Tile) => {
@@ -316,7 +318,6 @@ function App() {
   // --------------------------
   // Hover overlay intents
   // --------------------------
-
   const onHoverIntent = useCallback(
     (intent: HoverIntent) => {
       if (actionsDisabled) return;
@@ -357,7 +358,7 @@ function App() {
         aOrigin,
         bOrigin,
         adjTransport: adjTransportRef.current,
-        towerSet: towerSetRef.current as unknown as ReadonlySet<TileId>, // actual type is TileId set; runtime ok
+        towerSet: towerSetRef.current as unknown as ReadonlySet<TileId>,
       });
 
       enqueue(cmds);
@@ -365,45 +366,76 @@ function App() {
     [actionsDisabled, enqueue, grid, refreshRuntimeGraphs]
   );
 
-    return (
-    <div>
-      <SimViewCanvas
-        grid={grid}
-        towers={placedTowers}
-        dollyTile={dollyTile}
-        path={path}
-        hoveredTile={hoveredTile}
-        onTileHover={handleTileHover}
-        onTileClick={handleTileClick}
-        onArrive={handleArrive}
-        hoverPath={hoverPath}
-        carrying={carrying}
-        isMoving={isMoving}
-        queueLen={queue.length}
-        hoveredTowerTile={hoveredTowerTile}
-        onTowerHover={handleTowerHover}
-        onHoverIntent={onHoverIntent}
-      />
-      <WorldViewCanvas
-        grid={grid}
-        towers={placedTowers}
-        dollyTile={dollyTile}
-        path={path}
-        hoveredTile={hoveredTile}
-        onTileHover={handleTileHover}
-        onTileClick={handleTileClick}
-        onArrive={handleArrive}
-        hoverPath={hoverPath}
-        carrying={carrying}
-        isMoving={isMoving}
-        queueLen={queue.length}
-        hoveredTowerTile={hoveredTowerTile}
-        onTowerHover={handleTowerHover}
-        onHoverIntent={onHoverIntent}
-      />
+  // --------------------------
+  // View swap
+  // --------------------------
+  const swapViews = useCallback(() => {
+    setActiveView((v) => (v === "SIM" ? "WORLD" : "SIM"));
+  }, []);
 
-      {/* ✅ HUD: pure read-only data display */}
+  const simIsPrimary = activeView === "SIM";
+  const worldIsPrimary = activeView === "WORLD";
+
+  return (
+    <div className="app-root">
+      {/* PRIMARY CANVAS */}
+      <div className={simIsPrimary ? "canvas-primary" : "canvas-pip"}>
+        <SimViewCanvas
+          grid={grid}
+          towers={placedTowers}
+          dollyTile={dollyTile}
+          path={path}
+          hoveredTile={hoveredTile}
+          onTileHover={handleTileHover}
+          onTileClick={handleTileClick}
+          onArrive={handleArrive}
+          hoverPath={hoverPath}
+          carrying={carrying}
+          isMoving={isMoving}
+          queueLen={queue.length}
+          hoveredTowerTile={hoveredTowerTile}
+          onTowerHover={handleTowerHover}
+          onHoverIntent={onHoverIntent}
+          activeView={activeView}
+        />
+
+        {!simIsPrimary && (
+          <button className="canvas-swap-btn" type="button" onClick={swapViews}>
+            ⇄
+          </button>
+        )}
+      </div>
+
+      {/* SECONDARY CANVAS (PiP) */}
       <div>
+        <WorldViewCanvas
+          grid={grid}
+          towers={placedTowers}
+          dollyTile={dollyTile}
+          path={path}
+          hoveredTile={hoveredTile}
+          onTileHover={handleTileHover}
+          onTileClick={handleTileClick}
+          onArrive={handleArrive}
+          hoverPath={hoverPath}
+          carrying={carrying}
+          isMoving={isMoving}
+          queueLen={queue.length}
+          hoveredTowerTile={hoveredTowerTile}
+          onTowerHover={handleTowerHover}
+          onHoverIntent={onHoverIntent}
+          activeView={activeView}
+        />
+
+        {!worldIsPrimary && (
+          <button className="canvas-swap-btn" type="button" onClick={swapViews}>
+            ⇄
+          </button>
+        )}
+      </div>
+
+      {/* HUD (overlay, read-only) */}
+      <div className="hud-wrap">
         <HudPanel
           grid={grid}
           dollyTile={dollyTile}
@@ -418,7 +450,6 @@ function App() {
       </div>
     </div>
   );
-
 }
 
-export default App;
+export default App

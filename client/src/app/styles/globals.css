@@ -1,3 +1,99 @@
 body {
-    background-color: #222;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.app-root {
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+.active-view-canvas-container {
+    height: 100vh;
+    width: 100vw;
+    background-color: #363636;  
+}
+
+.inactive-view-canvas-container {
+    height: 180px;
+    width: 340px;
+    padding: 10px;
+    z-index: 998;
+    position: absolute;
+    top: 18px;
+    right: 6px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, .5);
+    backdrop-filter: blur(2px);
+    pointer-events: none;
+    border: 1px solid white;
+}
+
+.canvas-swap-btn {
+    position: absolute;
+    top: 8px;
+    right: 356px;
+    height: 32px;
+    width: 32px;
+    font-size: 18px;
+    font-weight: 600;
+    color: rgb(255, 255, 255);
+    background-color: rgba(17, 24, 74, 1);
+    z-index: 999;
+    border: 1px solid white;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.hud-panel {
+  position: absolute;
+  right: 6px;
+  top: 228px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid white;
+  color: white;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  width: 332px;
+  height: 180px;
+  pointer-events: none;
+  z-index: 999;
+}
+
+.hud-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  margin-bottom: 10px;
+}
+
+.hud-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.hud-actions button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.12);
+  color: white;
+  cursor: pointer;
+}
+
+.hud-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hud-hint {
+  opacity: 0.85;
 }

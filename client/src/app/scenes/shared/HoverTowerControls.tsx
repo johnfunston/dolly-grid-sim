@@ -96,7 +96,7 @@ const panelStyle: CSSProperties = {
   gap: 8,
   padding: "6px",
   borderRadius: 999,
-  background: "rgba(15, 15, 18, 0.72)",
+  background: "rgba(157, 220, 57, 0.5)",
   border: "1px solid rgba(255,255,255,0.10)",
   boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
   backdropFilter: "blur(10px)",
@@ -108,7 +108,7 @@ const panelStyle: CSSProperties = {
 const actionBtnStyle = (disabled: boolean): CSSProperties => ({
   appearance: "none",
   border: "1px solid rgba(255,255,255,0.12)",
-  background: disabled ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.14)",
+  background: disabled ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.5)",
   color: "rgba(255,255,255,0.95)",
   borderRadius: 999,
   padding: "6px 10px",

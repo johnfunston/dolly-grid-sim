@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import type { GridConfig, Tile, Vec3 } from "../world/grid/gridTypes";
 import { tileToWorldCenter } from "../world/grid/gridMath";
-import "../styles/HudPanel.css";
+import "../styles/globals.css";
 
 export type HudPanelProps = {
   grid: GridConfig;
