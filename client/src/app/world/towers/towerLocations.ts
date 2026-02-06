@@ -15,7 +15,7 @@ export const generateTowerTiles = (
   const towerTiles: Tile[] = [];
 
   for (let z = 2; z < grid.rows; z += 2) {
-    for (let x = 2; x < grid.cols; x += 2) {
+    for (let x = 2; x < grid.cols -1; x += 2) {
       towerTiles.push({ x, z });
 
       if (towerTiles.length >= maxTowers) {

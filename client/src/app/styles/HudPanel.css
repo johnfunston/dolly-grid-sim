@@ -1,15 +1,15 @@
 .hud-panel {
   position: absolute;
   right: 12px;
-  top: 12px;
+  top: 228px;
   padding: 12px 14px;
   border-radius: 10px;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.3);
   color: white;
   font-family: system-ui, sans-serif;
   font-size: 13px;
-  width: 200px;
-  height: 360px;
+  width: 308px;
+  height: 180px;
   pointer-events: none;
   z-index: 999;
 }

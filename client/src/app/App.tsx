@@ -13,16 +13,16 @@ import WorldViewCanvas from "./scenes/WorldViewCanvas";
 import type { Command, HoverIntent } from "./world/sim/commands";
 import { CMD } from "./world/sim/commands";
 import { expandSwap } from "./world/sim/expandSwap";
+import './styles/globals.css';
 
 function App() {
   const grid = DEFAULT_GRID;
   const speed = 2;
 
-  const [dollyTile, setDollyTile] = useState<Tile>({ x: 0, z: 0 });
+  const [dollyTile, setDollyTile] = useState<Tile>({ x: 7, z: 5 });
   const [path, setPath] = useState<Tile[]>([]);
   const [hoveredTile, setHoveredTile] = useState<Tile | null>(null);
   const [hoveredTowerTile, setHoveredTowerTile] = useState<Tile | null>(null);
-
 
   // carrying is the carried tower's ORIGINAL tile (source-of-truth for mode)
   const [carrying, setCarrying] = useState<Tile | null>(null);

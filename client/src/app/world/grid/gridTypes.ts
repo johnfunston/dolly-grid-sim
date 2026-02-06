@@ -22,7 +22,7 @@ export interface GridConfig {
 }
 
 export const DEFAULT_GRID: Readonly<GridConfig> = {
-  cols: 14,
+  cols: 15,
   rows: 11, //12x16 will make 192 tiles, which means 24 towers should comfortably with minimum 1 tile buffers between
   tileSize: 1,
   origin: { x: 0, y: 0, z: 0 },

@@ -30,7 +30,7 @@ export default function GridOverlay({ grid}: GridOverlayProps) {
               [x0, y, z],
               [x1, y, z],
             ]}
-            color="rgb(67, 177, 185)"
+            color="rgb(67, 101, 149)"
             lineWidth={1}
           />
         );
@@ -46,7 +46,7 @@ export default function GridOverlay({ grid}: GridOverlayProps) {
               [x, y, z0],
               [x, y, z1],
             ]}
-            color="rgb(67, 177, 185)"
+            color="rgb(67, 101, 149)"
             lineWidth={1}
           />
         );

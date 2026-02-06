@@ -1,6 +1,7 @@
 // src/app/scenes/shared/Floor.tsx
 import type { GridConfig, Vec3 } from "../../world/grid/gridTypes";
 
+
 type FloorProps = {
   grid: GridConfig;
 };
@@ -22,7 +23,7 @@ export default function Floor({ grid }: FloorProps) {
   return (
     <mesh position={[center.x, center.y - height / 2, center.z]}>
       <boxGeometry args={[width, height, depth]} />
-      <meshStandardMaterial color="#707f82" />
+      <meshStandardMaterial color="#343434" />
     </mesh>
   );
 }

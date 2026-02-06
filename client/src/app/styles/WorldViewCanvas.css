@@ -1,11 +1,11 @@
 .world-view-canvas-container {
-    height: auto;
-    width: auto;
+    height: 180px;
+    width: 340px;
     padding: 10px;
     z-index: 998;
     position: absolute;
-    top: 36px;
-    left: 36px;
+    top: 0px;
+    right: 0px;
     background: rgba(0, 0, 0, .25);
     backdrop-filter: blur(2px);
     pointer-events: none;
