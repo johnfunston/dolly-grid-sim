@@ -1,3 +1,5 @@
+//gridMath.ts
+
 import type { GridConfig, Tile, TileId, Vec3 } from "./gridTypes";
 
 /**

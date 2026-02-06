@@ -1,3 +1,4 @@
+//towerLocations.ts
 //Layout/Content layerimport type { GridConfig, Tile, TileId } from "../grid/gridTypes";
 
 import type { GridConfig, Tile, TileId } from "../grid/gridTypes";
@@ -13,8 +14,8 @@ export const generateTowerTiles = (
 ): Tile[] => {
   const towerTiles: Tile[] = [];
 
-  for (let z = 1; z < grid.cols; z += 2) {
-    for (let x = 1; x < grid.rows; x += 2) {
+  for (let z = 2; z < grid.rows; z += 2) {
+    for (let x = 2; x < grid.cols; x += 2) {
       towerTiles.push({ x, z });
 
       if (towerTiles.length >= maxTowers) {

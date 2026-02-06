@@ -11,7 +11,7 @@ export default function GridOverlay({ grid}: GridOverlayProps) {
   const width = cols * tileSize;
   const depth = rows * tileSize;
 
-  const y =  tileSize * .1; // tiny lift to avoid z-fighting
+  const y =  tileSize * .025; // tiny lift to avoid z-fighting
 
   const x0 = origin.x;
   const x1 = origin.x + width;

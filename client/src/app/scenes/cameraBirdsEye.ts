@@ -1,5 +1,5 @@
-// src/app/scenes/cameraBirdsEye.ts
-import type { GridConfig, Vec3 } from "../world/grid/gridTypes";
+import type { GridConfig, Tile, Vec3 } from "../world/grid/gridTypes";
+import { tileToWorldCenter } from "../world/grid/gridMath";
 
 export type BirdsEyeCameraSpec = Readonly<{
   position: Vec3;
@@ -9,59 +9,66 @@ export type BirdsEyeCameraSpec = Readonly<{
   far: number;
 }>;
 
-const degToRad = (deg: number): number => (deg * Math.PI) / 180;
+export const BIRDS_EYE_FOV = 100;
+export const BIRDS_EYE_NEAR = 0.1;
+export const BIRDS_EYE_FAR = 500;
+
+export const BIRDS_EYE_HEIGHT_Y = 12;
+export const BIRDS_EYE_TRAIL_DISTANCE = 50;
+
+function normalize2(x: number, z: number): { x: number; z: number } {
+  const len = Math.hypot(x, z);
+  if (len <= 1e-6) return { x: 0, z: 1 };
+  return { x: x / len, z: z / len };
+}
 
 /**
- * Temporary birds-eye camera for Phase 1 visualization.
- * Deterministic: derived only from grid dimensions.
+ * Compute a desired chase camera position that trails behind the dolly
+ * based on travel direction.
  *
- * Notes:
- * - Positioned above grid center.
- * - Slight Z offset gives depth cue while remaining "birds-eye".
- * - Comfort factor ensures the grid fits with margin.
+ * - Target always dolly center
+ * - Height fixed (y = BIRDS_EYE_HEIGHT_Y)
+ * - Camera sits behind direction at fixed radius (BIRDS_EYE_TRAIL_DISTANCE)
+ * - If not moving, uses lastDir (provided) or default forward
  */
-export const getBirdsEyeCameraSpec = (grid: GridConfig): BirdsEyeCameraSpec => {
-  const { origin, cols, rows, tileSize } = grid;
+export const getBirdsEyeChaseSpec = (args: {
+  grid: GridConfig;
+  dollyTile: Tile;
+  path: readonly Tile[];
+  lastDir?: Readonly<{ x: number; z: number }>;
+}): BirdsEyeCameraSpec & {
+  dir: Readonly<{ x: number; z: number }>;
+} => {
+  const { grid, dollyTile, path, lastDir } = args;
 
-  const width = cols * tileSize;
-  const depth = rows * tileSize;
+  const target = tileToWorldCenter(dollyTile, grid);
 
-  const center: Vec3 = {
-    x: origin.x + width / 2,
-    y: origin.y,
-    z: origin.z + depth / 2,
-  };
+  let dirX = lastDir?.x ?? 0;
+  let dirZ = lastDir?.z ?? 1;
 
-  // Temporary defaults (easy to change/remove later)
-  const fov = 50; // degrees; moderate perspective without distortion
-  const comfort = 1.35; // extra margin so grid fits comfortably
+  // Direction from the first segment of the current path (axis-aligned in your grid)
+  if (path.length >= 2) {
+    const a = path[0];
+    const b = path[1];
+    const n = normalize2(b.x - a.x, b.z - a.z);
+    dirX = n.x;
+    dirZ = n.z;
+  }
 
-  // We want to fit the larger of width/depth in view.
-  // Distance from target for a perspective camera:
-  //   halfSize / tan(fov/2)
-  const maxDim = Math.max(width, depth);
-  const half = maxDim / 2;
-
-  const distance = (half / Math.tan(degToRad(fov) / 2)) * comfort;
-
-  // Birds-eye: mostly height. Add a small Z offset so depth direction is visible.
-  const zNudge = depth * 0.15;
+  const R = BIRDS_EYE_TRAIL_DISTANCE;
 
   const position: Vec3 = {
-    x: -5, //center.x
-    y: 15, //center.y + distance
-    z: -5, //center.z + zNudge
+    x: target.x - dirX * R,
+    y: BIRDS_EYE_HEIGHT_Y,
+    z: target.z - dirZ * R,
   };
-
-  // near/far derived from distance and grid size (safe, not tight)
-  const near = Math.max(0.1, distance / 100);
-  const far = distance + maxDim * 10;
 
   return {
     position,
-    target: center,
-    fov,
-    near,
-    far,
+    target,
+    fov: BIRDS_EYE_FOV,
+    near: BIRDS_EYE_NEAR,
+    far: BIRDS_EYE_FAR,
+    dir: { x: dirX, z: dirZ },
   };
 };

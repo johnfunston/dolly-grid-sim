@@ -1,3 +1,4 @@
+//neighbors.ts
 //Graph constructor
 
 import type { GridConfig, TileId } from "../grid/gridTypes";

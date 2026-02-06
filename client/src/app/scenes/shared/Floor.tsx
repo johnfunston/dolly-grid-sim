@@ -22,7 +22,7 @@ export default function Floor({ grid }: FloorProps) {
   return (
     <mesh position={[center.x, center.y - height / 2, center.z]}>
       <boxGeometry args={[width, height, depth]} />
-      <meshStandardMaterial color="#f6f6f6" />
+      <meshStandardMaterial color="#707f82" />
     </mesh>
   );
 }

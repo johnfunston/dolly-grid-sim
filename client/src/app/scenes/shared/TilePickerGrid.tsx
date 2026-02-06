@@ -1,3 +1,5 @@
+//TilePickerGrid.tsx
+
 import { useMemo } from "react";
 import type { GridConfig, Tile } from "../../world/grid/gridTypes";
 import { allTiles, tileToWorldCenter } from "../../world/grid/gridMath";

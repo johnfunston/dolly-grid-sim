@@ -1,3 +1,5 @@
+//bfs.ts
+
 import type { Tile, TileId } from "../grid/gridTypes";
 import { toTileId } from "../grid/gridTypes";
 import { parseTileId } from "../grid/gridMath";

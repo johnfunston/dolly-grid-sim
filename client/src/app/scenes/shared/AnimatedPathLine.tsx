@@ -1,7 +1,7 @@
-// src/app/scenes/shared/AnimatedPathLine.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Line } from "@react-three/drei";
+import { AdditiveBlending } from "three";
 
 import type { GridConfig, Tile } from "../../world/grid/gridTypes";
 import { tileToWorldCenter } from "../../world/grid/gridMath";
@@ -61,8 +61,6 @@ export default function AnimatedPathLine({
   const hasPath = path.length >= 2;
   const epsilon = yOffset ?? grid.tileSize * 0.25;
 
-  const pathKey = useMemo(() => path.map((t) => `${t.x}:${t.z}`).join(">"), [path]);
-
   const fullPoints = useMemo<Pt[]>(() => {
     if (!hasPath) return [];
     return path.map((tile) => {
@@ -85,33 +83,34 @@ export default function AnimatedPathLine({
 
   // drawPoints is state (used during render)
   const [drawPoints, setDrawPoints] = useState<Pt[]>([]);
-  const [activeKey, setActiveKey] = useState<string>("");
 
-  // When props path changes, just update the key (no ref writes here)
-  useEffect(() => {
-    setActiveKey(pathKey);
-    // Note: we intentionally do NOT setDrawPoints here to avoid your lint rule.
-  }, [pathKey]);
+  // Track which path we’re currently animating (ref only, no rerender)
+  const pathKeyRef = useRef<string>("");
 
   useFrame((_, dt) => {
-    // Handle reset in the frame loop (safe place to touch refs)
-    // If no path, keep it empty.
+    const key = path.map((t) => `${t.x}:${t.z}`).join(">");
+
+    // If path changed, reset safely here (frame loop is allowed to touch refs/state)
+    if (key !== pathKeyRef.current) {
+      pathKeyRef.current = key;
+      progressRef.current = 0;
+
+      if (!hasPath || fullPoints.length < 2 || totalLength <= 0) {
+        if (drawPoints.length !== 0) setDrawPoints([]);
+      } else {
+        setDrawPoints(fullPoints); // show full path immediately on new path
+      }
+      return;
+    }
+
+    // No path => keep it empty
     if (!hasPath || fullPoints.length < 2 || totalLength <= 0) {
       if (drawPoints.length !== 0) setDrawPoints([]);
       progressRef.current = 0;
       return;
     }
 
-    // If a new path just arrived (activeKey matches current pathKey),
-    // ensure we have initialized drawPoints and reset progress.
-    // We detect "uninitialized" by checking drawPoints length.
-    if (drawPoints.length === 0) {
-      progressRef.current = 0;
-      setDrawPoints(fullPoints); // show full path immediately
-      return;
-    }
-
-    // Advance
+    // Advance along path
     progressRef.current = Math.min(totalLength, progressRef.current + speed * dt);
 
     // Remaining segment after traveling progress
@@ -139,11 +138,40 @@ export default function AnimatedPathLine({
     }
   });
 
-  // Render
   if (!hasPath || drawPoints.length < 2) return null;
 
-  const linePoints: [number, number, number][] = drawPoints.map((p) => [p.x, p.y, p.z]);
+  const linePoints: [number, number, number][] = drawPoints.map((p) => [
+    p.x,
+    p.y - 0.2,
+    p.z,
+  ]);
 
-  
-  return <Line points={linePoints} color="green" lineWidth={2} />;
+  const glowColor = "#7dbc06";
+
+  return (
+    <group>
+      {/* Outer glow */}
+      <Line
+        points={linePoints}
+        color={glowColor}
+        lineWidth={10}
+        transparent
+        opacity={0.18}
+        blending={AdditiveBlending}
+        depthWrite={false}
+        toneMapped={false}
+      />
+      {/* Inner core */}
+      <Line
+        points={linePoints}
+        color={glowColor}
+        lineWidth={5}
+        transparent
+        opacity={0.55}
+        blending={AdditiveBlending}
+        depthWrite={false}
+        toneMapped={false}
+      />
+    </group>
+  );
 }

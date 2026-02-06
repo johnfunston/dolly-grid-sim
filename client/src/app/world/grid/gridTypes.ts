@@ -1,3 +1,4 @@
+//gridTypes.ts
 //Lowest layer
 
 export type Tile = Readonly<{ x: number; z: number }>;
@@ -21,8 +22,8 @@ export interface GridConfig {
 }
 
 export const DEFAULT_GRID: Readonly<GridConfig> = {
-  cols: 16,
-  rows: 12, //12x16 will make 192 tiles, which means 24 towers should comfortably with minimum 1 tile buffers between
+  cols: 14,
+  rows: 11, //12x16 will make 192 tiles, which means 24 towers should comfortably with minimum 1 tile buffers between
   tileSize: 1,
   origin: { x: 0, y: 0, z: 0 },
 };

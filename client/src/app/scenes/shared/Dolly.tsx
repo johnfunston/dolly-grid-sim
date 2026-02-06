@@ -1,9 +1,10 @@
-// src/app/scenes/shared/Dolly.tsx
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import type { Mesh } from "three";
+import { useGLTF } from "@react-three/drei";
+import { Box3, Vector3 } from "three";
+import type { Group } from "three";
 
-import type { GridConfig, Tile } from "../../world/grid/gridTypes";
+import type { GridConfig, Tile, Vec3 } from "../../world/grid/gridTypes";
 import { tileToWorldCenter } from "../../world/grid/gridMath";
 
 export type DollyProps = {
@@ -12,27 +13,79 @@ export type DollyProps = {
   path: readonly Tile[];
   speed: number; // world units / second
   onArrive?: (tile: Tile) => void;
+
+  // expose actual rendered world position each frame (still used to glue carried tower)
+  onPosition?: (pos: Vec3) => void;
+
+  // carrying drives a HEIGHT increase (scaleY), not a y-offset lift
+  isCarrying: boolean;
+
+  /**
+   * Final Y scale multiplier when carrying.
+   * Example: 1.35 means 35% taller while carrying.
+   */
+  carryingHeightScaleY?: number;
 };
 
 type Pt = Readonly<{ x: number; y: number; z: number }>;
 
-export default function Dolly({ grid, tile, path, speed, onArrive }: DollyProps) {
-  const meshRef = useRef<Mesh | null>(null);
-  const arrivedRef = useRef(false);
+const DOLLY_URL = "/assets/dolly-model.glb";
+const DOLLY_HOVER_Y = 0;
 
-  // Build world-space points for the path (lifted to sit on floor)
+const HEIGHT_ANIM_SECONDS = 0.25;
+const DEFAULT_CARRY_HEIGHT_SCALE_Y = 1.35;
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+export default function Dolly({
+  grid,
+  tile,
+  path,
+  speed,
+  onArrive,
+  onPosition,
+  isCarrying,
+  carryingHeightScaleY,
+}: DollyProps) {
+  // World transform (position) lives here
+  const dollyRef = useRef<Group | null>(null);
+
+  // Model scale group (footprint fit + height scaling) lives here
+  const modelGroupRef = useRef<Group | null>(null);
+
+  const arrivedRef = useRef(false);
+  const traveledRef = useRef(0);
+
+  const gltf = useGLTF(DOLLY_URL);
+
+  const { modelScale, modelOffset } = useMemo(() => {
+    const box = new Box3().setFromObject(gltf.scene);
+    const size = new Vector3();
+    const center = new Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+
+    const targetFootprint = 0.62;
+    const sx = size.x > 0 ? targetFootprint / size.x : 1;
+    const sz = size.z > 0 ? targetFootprint / size.z : 1;
+    const scale = Math.min(sx, sz);
+
+    // Center XZ and ground to y=0 (in local space)
+    const offset: [number, number, number] = [-center.x, -box.min.y, -center.z];
+
+    return { modelScale: scale, modelOffset: offset };
+  }, [gltf.scene]);
+
   const points = useMemo<Pt[]>(() => {
     if (path.length < 1) return [];
-    const size = 0.7;
-    const lift = size / 2;
-
     return path.map((t) => {
       const p = tileToWorldCenter(t, grid);
-      return { x: p.x, y: p.y + lift, z: p.z };
+      return { x: p.x, y: p.y + DOLLY_HOVER_Y, z: p.z };
     });
   }, [grid, path]);
 
-  // Segment lengths + total length
   const segLengths = useMemo<number[]>(() => {
     if (points.length < 2) return [];
     const out: number[] = [];
@@ -47,62 +100,89 @@ export default function Dolly({ grid, tile, path, speed, onArrive }: DollyProps)
     return out;
   }, [points]);
 
-  const totalLength = useMemo<number>(() => {
-    return segLengths.reduce((acc, n) => acc + n, 0);
-  }, [segLengths]);
+  const totalLength = useMemo(() => segLengths.reduce((acc, n) => acc + n, 0), [segLengths]);
 
-  // Distance traveled along the polyline (in world units)
-  const progress = useRef(0);
-
-
-  // Reset progress whenever path changes
-  useEffect(() => {
-    arrivedRef.current = false;
-    progress.current = 0;
-    progress.current = 0;
-  }, [path]);
-
-  // Fallback static position when not moving
   const fallbackPos = useMemo<[number, number, number]>(() => {
     const p = tileToWorldCenter(tile, grid);
-    const size = 0.7;
-    return [p.x, p.y + size / 2, p.z];
+    return [p.x, p.y + DOLLY_HOVER_Y, p.z];
   }, [grid, tile]);
 
-  useFrame((_, dt) => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
+  useEffect(() => {
+    arrivedRef.current = false;
+    traveledRef.current = 0;
+  }, [path]);
 
-    // No path (or trivial) => just sit at current tile
+  // Height animation state (1 -> target) over 0.25s
+  const heightAnimRef = useRef<{
+    from: number;
+    to: number;
+    elapsed: number;
+    value: number;
+  }>({ from: 1, to: 1, elapsed: 0, value: 1 });
+
+  useEffect(() => {
+    const target = isCarrying
+      ? (carryingHeightScaleY ?? DEFAULT_CARRY_HEIGHT_SCALE_Y)
+      : 1;
+
+    heightAnimRef.current = {
+      from: heightAnimRef.current.value,
+      to: target,
+      elapsed: 0,
+      value: heightAnimRef.current.value,
+    };
+  }, [isCarrying, carryingHeightScaleY]);
+
+  useFrame((_, dt) => {
+    const obj = dollyRef.current;
+    if (!obj) return;
+
+    // Update height tween
+    {
+      const a = heightAnimRef.current;
+      a.elapsed = Math.min(HEIGHT_ANIM_SECONDS, a.elapsed + dt);
+      const t = HEIGHT_ANIM_SECONDS > 0 ? a.elapsed / HEIGHT_ANIM_SECONDS : 1;
+      a.value = lerp(a.from, a.to, t);
+    }
+
+    // Apply model scale (footprint + animated height) via ref (NOT in render)
+    {
+      const mg = modelGroupRef.current;
+      if (mg) {
+        const heightY = heightAnimRef.current.value;
+        mg.scale.set(modelScale, modelScale * heightY, modelScale);
+      }
+    }
+
+    // Movement (unchanged)
     if (points.length < 2 || segLengths.length < 1 || totalLength <= 0) {
-      mesh.position.set(fallbackPos[0], fallbackPos[1], fallbackPos[2]);
+      const x = fallbackPos[0];
+      const y = fallbackPos[1];
+      const z = fallbackPos[2];
+
+      obj.position.set(x, y, z);
+      onPosition?.({ x, y, z });
       return;
     }
 
-    // Advance by fixed speed
-    progress.current = Math.min(totalLength, progress.current + speed * dt);
+    traveledRef.current = Math.min(totalLength, traveledRef.current + speed * dt);
 
-    // Find segment for current progress
-    let d = progress.current;
+    let d = traveledRef.current;
     let segIndex = 0;
-
     while (segIndex < segLengths.length && d >= segLengths[segIndex]) {
       d -= segLengths[segIndex];
       segIndex++;
     }
 
-    // If finished, snap to end and notify once
     if (segIndex >= segLengths.length) {
       const end = points[points.length - 1];
-      mesh.position.set(end.x, end.y, end.z);
+      obj.position.set(end.x, end.y, end.z);
+      onPosition?.({ x: end.x, y: end.y, z: end.z });
 
-      // optional: fire arrival once and stop further movement
       if (onArrive && !arrivedRef.current) {
-  console.log("[DOLLY] calling onArrive", path[path.length - 1]);
-  arrivedRef.current = true;
-  onArrive(path[path.length - 1]);
-}
-
+        arrivedRef.current = true;
+        onArrive(path[path.length - 1]);
+      }
       return;
     }
 
@@ -111,18 +191,22 @@ export default function Dolly({ grid, tile, path, speed, onArrive }: DollyProps)
     const segLen = segLengths[segIndex];
     const t = segLen > 0 ? d / segLen : 0;
 
-    // Lerp between a and b
-    mesh.position.set(
-      a.x + (b.x - a.x) * t,
-      a.y + (b.y - a.y) * t,
-      a.z + (b.z - a.z) * t
-    );
+    const x = a.x + (b.x - a.x) * t;
+    const y = a.y + (b.y - a.y) * t;
+    const z = a.z + (b.z - a.z) * t;
+
+    obj.position.set(x, y, z);
+    onPosition?.({ x, y, z });
   });
 
   return (
-    <mesh ref={meshRef}>
-      <boxGeometry args={[0.7, 0.25, 0.7]} />
-      <meshStandardMaterial color="red" />
-    </mesh>
+    <group ref={dollyRef}>
+      {/* Scale is applied in useFrame to avoid reading refs in render */}
+      <group ref={modelGroupRef}>
+        <primitive object={gltf.scene} position={modelOffset} />
+      </group>
+    </group>
   );
 }
+
+useGLTF.preload(DOLLY_URL);

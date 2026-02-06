@@ -1,0 +1,46 @@
+.hud-panel {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  width: 200px;
+  height: 360px;
+  pointer-events: none;
+  z-index: 999;
+}
+
+.hud-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  margin-bottom: 10px;
+}
+
+.hud-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.hud-actions button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.12);
+  color: white;
+  cursor: pointer;
+}
+
+.hud-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hud-hint {
+  opacity: 0.85;
+}
