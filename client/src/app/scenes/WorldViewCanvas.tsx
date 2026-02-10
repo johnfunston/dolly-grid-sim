@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import type { GridConfig, Tile, Vec3 } from "../world/grid/gridTypes";
 import type { PerspectiveCamera } from "three";
+import type { WorldCamMode } from "../ui/ControlPanel";
 
 import Floor from "./shared/Floor";
 import GridOverlay from "./shared/GridOverlay";
@@ -65,10 +66,8 @@ function axisFromClosestPathSegment(args: {
   const { grid, path, dollyWorldPos, lastAxis } = args;
   if (path.length < 2) return lastAxis;
 
-  // Convert path tiles to world centers (path lengths are small; this is fine).
   const pts = path.map((t) => tileToWorldCenter(t, grid));
 
-  // Find closest segment to dolly position in XZ plane.
   let bestI = 0;
   let bestD2 = Number.POSITIVE_INFINITY;
 
@@ -101,7 +100,6 @@ function axisFromClosestPathSegment(args: {
     }
   }
 
-  // Axis from the closest segment direction (your paths are axis-aligned)
   const aTile = path[bestI];
   const bTile = path[bestI + 1];
   const dx = bTile.x - aTile.x;
@@ -110,40 +108,215 @@ function axisFromClosestPathSegment(args: {
   if (Math.abs(dx) > Math.abs(dz)) return "X";
   if (Math.abs(dz) > Math.abs(dx)) return "Z";
 
-  // fallback (shouldn't happen for axis-aligned moves)
   return lastAxis;
+}
+
+type Dir2 = { axis: TravelAxis; sign: 1 | -1 };
+
+function dirFromClosestPathSegment(args: {
+  grid: GridConfig;
+  path: readonly Tile[];
+  dollyWorldPos: Vec3;
+  lastAxis: TravelAxis;
+}): Dir2 {
+  const { grid, path, dollyWorldPos, lastAxis } = args;
+
+  if (path.length < 2) {
+    return { axis: lastAxis, sign: 1 };
+  }
+
+  const pts = path.map((t) => tileToWorldCenter(t, grid));
+
+  let bestI = 0;
+  let bestD2 = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+
+    const abx = b.x - a.x;
+    const abz = b.z - a.z;
+
+    const apx = dollyWorldPos.x - a.x;
+    const apz = dollyWorldPos.z - a.z;
+
+    const abLen2 = abx * abx + abz * abz;
+    const t =
+      abLen2 > 1e-6
+        ? Math.max(0, Math.min(1, (apx * abx + apz * abz) / abLen2))
+        : 0;
+
+    const cx = a.x + abx * t;
+    const cz = a.z + abz * t;
+
+    const dx = dollyWorldPos.x - cx;
+    const dz = dollyWorldPos.z - cz;
+
+    const d2 = dx * dx + dz * dz;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      bestI = i;
+    }
+  }
+
+  const aTile = path[bestI];
+  const bTile = path[bestI + 1];
+
+  const dxT = bTile.x - aTile.x;
+  const dzT = bTile.z - aTile.z;
+
+  if (Math.abs(dxT) > Math.abs(dzT)) {
+    return { axis: "X", sign: dxT >= 0 ? 1 : -1 };
+  }
+  return { axis: "Z", sign: dzT >= 0 ? 1 : -1 };
+}
+
+function buildLaneSpec(args: {
+  grid: GridConfig;
+  liveTile: Tile; // lane coordinate source: z if axis X, x if axis Z
+  dir: Dir2;
+  y: number;
+  backTiles: number;
+}): { position: Vec3; target: Vec3 } {
+  const { grid, liveTile, dir, y, backTiles } = args;
+  const { origin, tileSize, cols, rows } = grid;
+
+  const insideMinX = origin.x + 0.5 * tileSize;
+  const insideMaxX = origin.x + (cols - 0.5) * tileSize;
+  const insideMinZ = origin.z + 0.5 * tileSize;
+  const insideMaxZ = origin.z + (rows - 0.5) * tileSize;
+
+  const outsideMinX = origin.x - 0.5 * tileSize;
+  const outsideMaxX = origin.x + (cols + 0.5) * tileSize;
+  const outsideMinZ = origin.z - 0.5 * tileSize;
+  const outsideMaxZ = origin.z + (rows + 0.5) * tileSize;
+
+  const push = backTiles * tileSize;
+
+  if (dir.axis === "X") {
+    const laneZ = origin.z + (liveTile.z + 0.5) * tileSize;
+
+    if (dir.sign === 1) {
+      // moving +X: camera on +X outside looking back toward -X
+      return {
+        position: { x: outsideMaxX + push, y, z: laneZ },
+        target: { x: insideMinX, y: 0, z: laneZ },
+      };
+    }
+
+    // moving -X: camera on -X outside looking toward +X
+    return {
+      position: { x: outsideMinX - push, y, z: laneZ },
+      target: { x: insideMaxX, y: 0, z: laneZ },
+    };
+  }
+
+  // axis === "Z"
+  const laneX = origin.x + (liveTile.x + 0.5) * tileSize;
+
+  if (dir.sign === 1) {
+    // moving +Z: camera on +Z outside looking back toward -Z
+    return {
+      position: { x: laneX, y, z: outsideMaxZ + push },
+      target: { x: laneX, y: 0, z: insideMinZ },
+    };
+  }
+
+  // moving -Z: camera on -Z outside looking toward +Z
+  return {
+    position: { x: laneX, y, z: outsideMinZ - push },
+    target: { x: laneX, y: 0, z: insideMaxZ },
+  };
 }
 
 // ------------------------------------
 // WorldCamController: SNAP ONLY + segment-axis-aware
-// - Cameras are static (fixed position + fixed target)
-// - Axis flips as the dolly hits corners (closest segment changes)
-// - No lerp, no damping, no smoothing
+// Modes:
+// - TRACK: existing tile+axis selection via worldCameras map
+// - LANE: static outside-edge camera looking down the current lane in direction of travel
+// - CENTER_OVERVIEW: fixed center shot
 // ------------------------------------
 function WorldCamController({
   grid,
   path,
   dollyWorldPosRef,
+  worldCamMode,
 }: {
   grid: GridConfig;
   path: readonly Tile[];
   dollyWorldPosRef: React.RefObject<Vec3>;
+  worldCamMode: WorldCamMode;
 }) {
   const { camera: r3fCamera } = useThree();
   const cam = r3fCamera as PerspectiveCamera;
 
-  // Build all camera specs once per grid
   const camMap = useMemo(() => buildWorldCamMap(grid), [grid]);
 
   const lastCamIdRef = useRef<string>("");
   const lastAxisRef = useRef<TravelAxis>("X");
 
-  // Seed once so first frame is correct
+  const gridCenter = useMemo(() => {
+    const cx = grid.origin.x + (grid.cols * grid.tileSize) / 2;
+    const cz = grid.origin.z + (grid.rows * grid.tileSize) / 2;
+    return { x: cx, y: 0, z: cz };
+  }, [grid]);
+
+  const applySpec = (spec: {
+    position: { x: number; y: number; z: number };
+    target: { x: number; y: number; z: number };
+    fov?: number;
+    near?: number;
+    far?: number;
+  }) => {
+    cam.position.set(spec.position.x, spec.position.y, spec.position.z);
+    cam.lookAt(spec.target.x, spec.target.y, spec.target.z);
+    cam.fov = spec.fov ?? WORLD_FOV;
+    cam.near = spec.near ?? WORLD_NEAR;
+    cam.far = spec.far ?? WORLD_FAR;
+    cam.updateProjectionMatrix();
+  };
+
+  // Seed (and re-seed on mode change) so the first frame is correct
   useEffect(() => {
+    if (worldCamMode === "CENTER_OVERVIEW") {
+      applySpec({
+        position: { x: gridCenter.x, y: 16, z: gridCenter.z},
+        target: gridCenter,
+        fov: WORLD_FOV,
+        near: WORLD_NEAR,
+        far: WORLD_FAR,
+      });
+      lastCamIdRef.current = "__CENTER__";
+      return;
+    }
+
     const p =
       dollyWorldPosRef.current ?? tileToWorldCenter({ x: 0, z: 0 }, grid);
     const liveTile = worldPosToTile(grid, p);
 
+    if (worldCamMode === "LANE") {
+      const dir = dirFromClosestPathSegment({
+        grid,
+        path,
+        dollyWorldPos: p,
+        lastAxis: lastAxisRef.current,
+      });
+      lastAxisRef.current = dir.axis;
+
+      const lane = buildLaneSpec({ grid, liveTile, dir, y: 6, backTiles: 8 });
+      applySpec({
+        position: lane.position,
+        target: lane.target,
+        fov: WORLD_FOV,
+        near: WORLD_NEAR,
+        far: WORLD_FAR,
+      });
+
+      lastCamIdRef.current = `__LANE__:${dir.axis}:${dir.sign}:${liveTile.x}:${liveTile.z}`;
+      return;
+    }
+
+    // TRACK
     const axis = axisFromClosestPathSegment({
       grid,
       path,
@@ -156,24 +329,57 @@ function WorldCamController({
     const spec = camMap[id];
     if (!spec) return;
 
-    cam.position.set(spec.position.x, spec.position.y, spec.position.z);
-    cam.lookAt(spec.target.x, spec.target.y, spec.target.z);
-
-    cam.fov = spec.fov ?? WORLD_FOV;
-    cam.near = spec.near ?? WORLD_NEAR;
-    cam.far = spec.far ?? WORLD_FAR;
-    cam.updateProjectionMatrix();
-
+    applySpec(spec);
     lastCamIdRef.current = id;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grid, camMap]); // seed only (do not depend on path here)
+  }, [grid, camMap, worldCamMode, gridCenter]);
 
   useFrame(() => {
+    if (worldCamMode === "CENTER_OVERVIEW") {
+      if (lastCamIdRef.current !== "__CENTER__") {
+        applySpec({
+          position: { x: gridCenter.x, y: 16, z: gridCenter.z},
+          target: gridCenter,
+          fov: WORLD_FOV,
+          near: WORLD_NEAR,
+          far: WORLD_FAR,
+        });
+        lastCamIdRef.current = "__CENTER__";
+      }
+      return;
+    }
+
     const p = dollyWorldPosRef.current;
     if (!p) return;
 
     const liveTile = worldPosToTile(grid, p);
 
+    if (worldCamMode === "LANE") {
+      const dir = dirFromClosestPathSegment({
+        grid,
+        path,
+        dollyWorldPos: p,
+        lastAxis: lastAxisRef.current,
+      });
+      lastAxisRef.current = dir.axis;
+
+      const key = `__LANE__:${dir.axis}:${dir.sign}:${liveTile.x}:${liveTile.z}`;
+      if (lastCamIdRef.current === key) return;
+
+      const lane = buildLaneSpec({ grid, liveTile, dir, y: 6, backTiles: 8 });
+      applySpec({
+        position: lane.position,
+        target: lane.target,
+        fov: WORLD_FOV,
+        near: WORLD_NEAR,
+        far: WORLD_FAR,
+      });
+
+      lastCamIdRef.current = key;
+      return;
+    }
+
+    // TRACK
     const axis = axisFromClosestPathSegment({
       grid,
       path,
@@ -188,15 +394,7 @@ function WorldCamController({
     const spec = camMap[id];
     if (!spec) return;
 
-    // SNAP: static cam pose + static target (no dolly tracking)
-    cam.position.set(spec.position.x, spec.position.y, spec.position.z);
-    cam.lookAt(spec.target.x, spec.target.y, spec.target.z);
-
-    cam.fov = spec.fov ?? WORLD_FOV;
-    cam.near = spec.near ?? WORLD_NEAR;
-    cam.far = spec.far ?? WORLD_FAR;
-    cam.updateProjectionMatrix();
-
+    applySpec(spec);
     lastCamIdRef.current = id;
   });
 
@@ -227,6 +425,9 @@ export type WorldViewCanvasProps = {
   onHoverIntent: (intent: HoverIntent) => void;
 
   activeView: "SIM" | "WORLD";
+  worldCamMode: WorldCamMode;
+
+  showGrid: boolean;
 };
 
 export default function WorldViewCanvas({
@@ -246,12 +447,13 @@ export default function WorldViewCanvas({
   hoverPath,
   onHoverIntent,
   activeView,
+  worldCamMode,
+  showGrid,
 }: WorldViewCanvasProps) {
   const isActive = activeView === "WORLD";
   const actionsDisabled = isMoving || queueLen > 0;
   const isCarrying = !!carrying;
 
-  // Keep dolly's rendered world pos in a ref (glues carried tower + drives cam selection)
   const dollyWorldPosRef = useRef<Vec3>(tileToWorldCenter(dollyTile, grid));
   useEffect(() => {
     dollyWorldPosRef.current = tileToWorldCenter(dollyTile, grid);
@@ -269,18 +471,17 @@ export default function WorldViewCanvas({
     >
       <Canvas
         camera={{
-          // Seed only — controller snaps to the correct cam on first mount
           position: [0, 12, 6],
           fov: WORLD_FOV,
           near: WORLD_NEAR,
           far: WORLD_FAR,
         }}
       >
-        {/* ✅ Snap-only static world cameras (segment-axis-aware selection) */}
         <WorldCamController
           grid={grid}
           path={path}
           dollyWorldPosRef={dollyWorldPosRef}
+          worldCamMode={worldCamMode}
         />
 
         <ambientLight intensity={0.4} />
@@ -290,7 +491,7 @@ export default function WorldViewCanvas({
 
         <Floor grid={grid} />
         <PathLine grid={grid} path={hoverPath} yOffset={grid.tileSize * 0.26} />
-        <GridOverlay grid={grid} />
+{showGrid && <GridOverlay grid={grid} />}
         <AnimatedPathLine grid={grid} path={path} speed={2} />
 
         <TowerClones
@@ -313,7 +514,7 @@ export default function WorldViewCanvas({
           />
         )}
 
-        {isActive && (
+        {isActive && !isMoving && (
           <>
             <HoverHighlight grid={grid} tile={hoveredTile} />
 

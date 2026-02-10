@@ -16,7 +16,7 @@ body {
 .active-view-canvas-container {
     height: 100vh;
     width: 100vw;
-    background-color: #363636;  
+    background-color: rgba(0, 0, 0, 1);  
 }
 
 .inactive-view-canvas-container {
@@ -25,75 +25,410 @@ body {
     padding: 10px;
     z-index: 998;
     position: absolute;
-    top: 18px;
+    top: 312px;
     right: 6px;
-    border-radius: 6px;
+    border-radius: 12px;
     background: rgba(0, 0, 0, .5);
     backdrop-filter: blur(2px);
     pointer-events: none;
     border: 1px solid white;
 }
 
-.canvas-swap-btn {
+.world-swap-btn {
     position: absolute;
-    top: 8px;
-    right: 356px;
+    top: 402px;
+    right: 350px;
     height: 32px;
     width: 32px;
     font-size: 18px;
     font-weight: 600;
     color: rgb(255, 255, 255);
-    background-color: rgba(17, 24, 74, 1);
+    background-color: rgba(155, 226, 79, 0.5);
+    backdrop-filter: blur(20px);
     z-index: 999;
     border: 1px solid white;
     border-radius: 999px;
     cursor: pointer;
 }
 
+.sim-swap-btn {
+    position: absolute;
+    top: 402px;
+    right: 350px;
+    height: 32px;
+    width: 32px;
+    font-size: 18px;
+    font-weight: 600;
+    color: rgb(255, 255, 255);
+    background-color: rgba(79, 223, 226, .5);
+    backdrop-filter: blur(20px);
+    z-index: 999;
+    border: 1px solid white;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+/* HUD layout */
 .hud-panel {
+  pointer-events: none;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+  z-index: 999;
   position: absolute;
   right: 6px;
-  top: 228px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(0,0,0,0.5);
+  top: 520px;
+  height: 280px;
+  background-color: rgba(0, 0, 0, .5);
+  backdrop-filter: blur(2px);
   border: 1px solid white;
-  color: white;
-  font-family: system-ui, sans-serif;
-  font-size: 13px;
-  width: 332px;
-  height: 180px;
-  pointer-events: none;
-  z-index: 999;
+  border-radius: 12px;
+  max-width: 336px;
+  width: 336px;
+  padding: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  font-family: "Satoshi", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 .hud-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 14px;
-  margin-bottom: 10px;
-}
-
-.hud-actions {
   display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.hud-actions button {
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.25);
-  background: rgba(255,255,255,0.12);
-  color: white;
+.hud-item {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.hud-item-full {
+  width: 100%;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* Moving yes/no */
+.hud-yes {
+  color: rgba(120, 255, 120, 0.95);
+  font-weight: 700;
+}
+
+.hud-no {
+  color: rgba(255, 120, 120, 0.95);
+  font-weight: 700;
+}
+
+/* Chips */
+.hud-chip-row {
+  width: 250px;
+  margin-left: 8px;
+  margin-top: 8px;
+  height: 140px;
+  max-height: 140px;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 6px;
+  padding: 12px 6px;
+  overflow-y: hidden;
+  background-color: rgb(23, 23, 23, .5);
+  backdrop-filter: blur(2px);
+}
+
+.hud-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.35);
+  color: rgba(255,255,255,0.92);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  height: 14px;
+  margin: 1px;
+  font-size: 12px;
+}
+
+/* Chip variants */
+.hud-chip-idle {
+  opacity: 0.75;
+}
+
+.hud-chip-done {
+  background: rgba(120, 255, 120, 0.18);
+  border-color: rgba(120, 255, 120, 0.35);
+}
+
+.hud-chip-move {
+  background: rgba(120, 190, 255, 0.18);
+  border-color: rgba(120, 190, 255, 0.35);
+}
+
+.hud-chip-lift {
+  background: rgba(255, 220, 120, 0.18);
+  border-color: rgba(255, 220, 120, 0.35);
+}
+
+.hud-chip-drop {
+  background: rgba(255, 160, 120, 0.18);
+  border-color: rgba(255, 160, 120, 0.35);
+}
+
+.hud-chip-swap {
+  background: rgba(200, 160, 255, 0.18);
+  border-color: rgba(200, 160, 255, 0.35);
+}
+
+.hud-chip-generic {
+  opacity: 0.9;
+}
+
+/* About Modal */
+.about-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+}
+
+.about-modal__backdrop-close {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.55);
   cursor: pointer;
 }
 
-.hud-actions button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.about-modal__card {
+  position: relative;
+  width: min(860px, calc(100vw - 24px));
+  max-height: min(86vh, 900px);
+  overflow: auto;
+  background: rgba(10, 10, 10, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px 6px 6px;
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: "Satoshi", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
 }
 
-.hud-hint {
+.about-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 16px 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.about-modal__title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.about-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.about-modal__subtitle {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.about-modal__close-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.about-modal__close-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.about-modal__intro {
+  padding: 14px 16px 8px 16px;
+}
+
+.about-modal__p {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.about-modal__p--tight {
+  margin-bottom: 6px;
+}
+
+.about-modal__list {
+  margin: 0 0 10px 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.about-modal__sections {
+  padding: 6px 10px 14px 10px;
+}
+
+.about-modal__section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.about-modal__section:first-child {
+  border-top: 0;
+}
+
+.about-modal__section-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: left;
+}
+
+.about-modal__section-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.about-modal__chev {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0.85;
+}
+
+.about-modal__chev::before {
+  content: "›";
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform 120ms ease;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.about-modal__section-header.is-open .about-modal__chev::before {
+  transform: rotate(90deg); /* right chevron becomes down */
+}
+
+.about-modal__section-title {
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.2px;
+}
+
+.about-modal__section-content {
+  padding: 0 10px 14px 38px; /* indent to align under title after chevron */
+}
+
+.about-modal__section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.about-modal__subhead {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  opacity: 0.9;
+}
+
+/* Scrollbar (optional, safe defaults) */
+.about-modal__card::-webkit-scrollbar {
+  width: 10px;
+  
+}
+
+.about-modal__card::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+.about-modal__card::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.about-button-wrap {
+  position: fixed;
+  bottom: 18px;
+  right: 6px;
+  z-index: 999;
+}
+
+.about-button-wrap button {
+  height: 60px;
+  width: 363px;
+  border-radius: 12px;
+  background-color: rgba(0, 0, 0, .5);
+  backdrop-filter: blur(2px);
+  border: 1px solid white;
+  color: white;
+  cursor: pointer;
+  font-family: "Satoshi", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  font-size: 12px;
+  transition: .33s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.about-button-wrap button:hover {
+  background-color: rgba(0, 0, 0, .75)
+}
+
+.info-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid white;
+  font-size: 14px;
+  border-radius: 36px;
+  min-height: 18px;
+  min-width: 18px;
+  padding: 3px;
+}
+
+.project-title {
+  position: absolute;
+  z-index: 1000;
+  top: 6px;
+  left: 6px;
+  color: white;
+  font-weight: 200;
+  font-size: 12px;
+  pointer-events: none;
+  line-height: 0px;
+  font-family: "Satoshi", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
 }

@@ -10,6 +10,10 @@ import { bfsPath } from "./world/pathfinding/bfs";
 import SimViewCanvas from "./scenes/SimViewCanvas";
 import WorldViewCanvas from "./scenes/WorldViewCanvas";
 import HudPanel from "./ui/HudPanel";
+import AboutModal from "./ui/AboutModal";
+import ControlPanel from "./ui/ControlPanel";
+import type { ActiveView, SimCamMode, WorldCamMode } from "./ui/ControlPanel";
+import OrbitHint from "./ui/OrbitHint";
 
 import type { Command, HoverIntent } from "./world/sim/commands";
 import { CMD } from "./world/sim/commands";
@@ -17,18 +21,59 @@ import { expandSwap } from "./world/sim/expandSwap";
 
 import "./styles/globals.css";
 
-type ActiveView = "SIM" | "WORLD";
+function tileEquals(a: Tile, b: Tile) {
+  return a.x === b.x && a.z === b.z;
+}
 
 function App() {
   const grid = DEFAULT_GRID;
   const speed = 2;
 
-  // ✅ NEW: which canvas is primary
+  // which canvas is primary
   const [activeView, setActiveView] = useState<ActiveView>("SIM");
+
+  // camera mode state
+  const [simCamMode, setSimCamMode] = useState<SimCamMode>("CHASE");
+  const [worldCamMode, setWorldCamMode] =
+    useState<WorldCamMode>("CENTER_OVERVIEW");
+
+  // for start/destination camera end of sequence targetting
+  const [simCamReseed, setSimCamReseed] = useState(0);
+
+  const handleSetSimCamMode = useCallback((next: SimCamMode) => {
+    setSimCamMode((prev) => {
+      if (prev === next) setSimCamReseed((n) => n + 1);
+      return next;
+    });
+  }, []);
+
   const [dollyTile, setDollyTile] = useState<Tile>({ x: 7, z: 5 });
   const [path, setPath] = useState<Tile[]>([]);
   const [hoveredTile, setHoveredTile] = useState<Tile | null>(null);
   const [hoveredTowerTile, setHoveredTowerTile] = useState<Tile | null>(null);
+  const [showGrid, setShowGrid] = useState(true);
+
+  // Queue history for HUD chips
+  const [queueHistory, setQueueHistory] = useState<string[]>(["IDLE"]);
+
+  const resetQueueHistoryForNewRun = useCallback(() => {
+    setQueueHistory(["IDLE"]);
+  }, []);
+
+  const pushChip = useCallback((label: string) => {
+    setQueueHistory((prev) => {
+      const base = prev.length === 1 && prev[0] === "IDLE" ? [] : prev;
+      return [...base, label];
+    });
+  }, []);
+
+  const pushDoneChipIfMissing = useCallback(() => {
+    setQueueHistory((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1] === "DONE") return prev;
+      const base = prev.length === 1 && prev[0] === "IDLE" ? [] : prev;
+      return [...base, "DONE"];
+    });
+  }, []);
 
   // carrying is the carried tower's ORIGINAL tile (source-of-truth for mode)
   const [carrying, setCarrying] = useState<Tile | null>(null);
@@ -39,10 +84,8 @@ function App() {
   // queue state is only for rendering / disabling inputs
   const [queue, setQueue] = useState<Command[]>([]);
 
-  // --------------------------
-  // helpers
-  // --------------------------
-  const tileEquals = (a: Tile, b: Tile) => a.x === b.x && a.z === b.z;
+  // about modal
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   const isMoving = path.length >= 2;
   const actionsDisabled = isMoving || queue.length > 0;
@@ -88,14 +131,15 @@ function App() {
   // runtime-derived refs
   const towerSetRef = useRef<ReadonlySet<TileId>>(towerSet);
   const adjRef = useRef(buildPrunedAdjacency("NORMAL", grid, baseEdges, towerSet));
-  const adjTransportRef = useRef(buildPrunedAdjacency("TRANSPORT", grid, baseEdges, towerSet));
+  const adjTransportRef = useRef(
+    buildPrunedAdjacency("TRANSPORT", grid, baseEdges, towerSet)
+  );
 
   useEffect(() => {
     dollyTileRef.current = dollyTile;
   }, [dollyTile]);
 
   useEffect(() => {
-    // UI state mirrors this, but runner owns truth via towersRef
     towersRef.current = towers;
   }, [towers]);
 
@@ -108,7 +152,6 @@ function App() {
   }, [path]);
 
   useEffect(() => {
-    // keep in sync for UI-derived towerSet, but runner will refresh it too
     towerSetRef.current = towerSet;
   }, [towerSet]);
 
@@ -121,35 +164,65 @@ function App() {
     towerSetRef.current = ts;
 
     const runtimeMode = carryingRef.current ? "TRANSPORT" : "NORMAL";
-    adjRef.current = buildPrunedAdjacency(runtimeMode, grid, baseEdgesRef.current, ts);
-    adjTransportRef.current = buildPrunedAdjacency("TRANSPORT", grid, baseEdgesRef.current, ts);
+    adjRef.current = buildPrunedAdjacency(
+      runtimeMode,
+      grid,
+      baseEdgesRef.current,
+      ts
+    );
+    adjTransportRef.current = buildPrunedAdjacency(
+      "TRANSPORT",
+      grid,
+      baseEdgesRef.current,
+      ts
+    );
   }, [grid]);
 
   // --------------------------
-  // Runner (queue ref is authoritative)
+  // Runner
   // --------------------------
   const runNextRef = useRef<() => void>(() => {});
 
-  const setQueueBoth = (next: Command[]) => {
+  // DONE guard (prevents spamming DONE every render)
+  const didPushDoneRef = useRef(false);
+
+  const resetDoneGuard = useCallback(() => {
+    didPushDoneRef.current = false;
+  }, []);
+
+  const setQueueBoth = useCallback((next: Command[]) => {
     queueRef.current = next;
     setQueue(next);
-  };
+  }, []);
 
-  const popHead = () => {
+  const popHead = useCallback(() => {
     const next = queueRef.current.slice(1);
     setQueueBoth(next);
-  };
+  }, [setQueueBoth]);
 
-  const replaceQueue = (next: Command[]) => {
-    setQueueBoth(next);
-  };
+  const replaceQueue = useCallback(
+    (next: Command[]) => {
+      setQueueBoth(next);
+    },
+    [setQueueBoth]
+  );
 
-  const enqueue = useCallback((cmds: Command[]) => {
-    if (cmds.length === 0) return;
-    const next = [...queueRef.current, ...cmds];
-    setQueueBoth(next);
-    queueMicrotask(() => runNextRef.current());
-  }, []);
+  const enqueue = useCallback(
+    (cmds: Command[]) => {
+      if (cmds.length === 0) return;
+
+      // If idle and a new run begins, clear prior chips and re-arm DONE.
+      if (pathRef.current.length < 2 && queueRef.current.length === 0) {
+        resetQueueHistoryForNewRun();
+        resetDoneGuard();
+      }
+
+      const next = [...queueRef.current, ...cmds];
+      setQueueBoth(next);
+      queueMicrotask(() => runNextRef.current());
+    },
+    [resetQueueHistoryForNewRun, resetDoneGuard, setQueueBoth]
+  );
 
   const runNext = useCallback(() => {
     // do not execute while moving
@@ -159,7 +232,15 @@ function App() {
     refreshRuntimeGraphs();
 
     const q = queueRef.current;
-    if (q.length === 0) return;
+
+    // ✅ DONE condition occurs here (only when idle, because runNext bails while moving)
+    if (q.length === 0) {
+      if (!didPushDoneRef.current) {
+        pushDoneChipIfMissing();
+        didPushDoneRef.current = true;
+      }
+      return;
+    }
 
     const current = q[0];
     const kick = () => queueMicrotask(() => runNextRef.current());
@@ -193,7 +274,6 @@ function App() {
       }
 
       const nextPath = bfsPath(adjRef.current, from, to);
-
       if (nextPath.length < 2) {
         popHead();
         kick();
@@ -201,6 +281,11 @@ function App() {
       }
 
       popHead();
+
+      // first movement in a run should re-arm DONE + start chips
+      resetDoneGuard();
+      pushChip("MOVE");
+
       setPath(nextPath);
       pathRef.current = nextPath;
       return;
@@ -235,6 +320,8 @@ function App() {
       carryingRef.current = target;
       setCarrying(target);
 
+      pushChip("LIFT");
+
       refreshRuntimeGraphs();
 
       popHead();
@@ -243,7 +330,7 @@ function App() {
     }
 
     // DROP
-    {
+    if (current.type === "DROP") {
       const at = dollyTileRef.current;
       const target = current.tile;
 
@@ -273,17 +360,24 @@ function App() {
       carryingRef.current = null;
       setCarrying(null);
 
+      pushChip("DROP");
+
       refreshRuntimeGraphs();
 
       popHead();
       kick();
       return;
     }
-  }, [refreshRuntimeGraphs]);
+
+    // Fallback: unknown / unsupported cmd => drop it
+    popHead();
+    kick();
+  }, [popHead, pushChip, refreshRuntimeGraphs, replaceQueue, resetDoneGuard]);
 
   useEffect(() => {
     runNextRef.current = runNext;
   }, [runNext]);
+
 
   // --------------------------
   // Grid hover/click
@@ -361,9 +455,11 @@ function App() {
         towerSet: towerSetRef.current as unknown as ReadonlySet<TileId>,
       });
 
+      // "SWAP" is a semantic chip for the user's intent (the queue itself will still emit MOVE/LIFT/DROP as it runs)
+      pushChip("SWAP");
       enqueue(cmds);
     },
-    [actionsDisabled, enqueue, grid, refreshRuntimeGraphs]
+    [actionsDisabled, enqueue, grid, pushChip, refreshRuntimeGraphs]
   );
 
   // --------------------------
@@ -376,8 +472,26 @@ function App() {
   const simIsPrimary = activeView === "SIM";
   const worldIsPrimary = activeView === "WORLD";
 
+  // --------------------------
+  // Orbit Hint for cam modes
+  // --------------------------
+  const showOrbitHint =
+    activeView === "SIM" &&
+    !isMoving &&
+    (simCamMode === "DOLLY" ||
+      simCamMode === "PATH_START" ||
+      simCamMode === "DESTINATION_TILE");
+
   return (
     <div className="app-root">
+      <h1 className='project-title'>dolly_grid_sim v0.1</h1>
+      {/* ABOUT MODAL BUTTON */}
+      <div className="about-button-wrap">
+        <button type="button" onClick={() => setAboutOpen(true)}>
+          <span className="info-icon">i</span> PROJECT DETAILS
+        </button>
+      </div>
+
       {/* PRIMARY CANVAS */}
       <div className={simIsPrimary ? "canvas-primary" : "canvas-pip"}>
         <SimViewCanvas
@@ -397,10 +511,13 @@ function App() {
           onTowerHover={handleTowerHover}
           onHoverIntent={onHoverIntent}
           activeView={activeView}
+          simCamMode={simCamMode}
+          simCamReseed={simCamReseed}
+          showGrid={showGrid}
         />
 
         {!simIsPrimary && (
-          <button className="canvas-swap-btn" type="button" onClick={swapViews}>
+          <button className="world-swap-btn" type="button" onClick={swapViews}>
             ⇄
           </button>
         )}
@@ -425,17 +542,18 @@ function App() {
           onTowerHover={handleTowerHover}
           onHoverIntent={onHoverIntent}
           activeView={activeView}
+          worldCamMode={worldCamMode}
+          showGrid={showGrid}
         />
 
         {!worldIsPrimary && (
-          <button className="canvas-swap-btn" type="button" onClick={swapViews}>
+          <button className={"sim-swap-btn"} type="button" onClick={swapViews}>
             ⇄
           </button>
         )}
       </div>
 
       {/* HUD (overlay, read-only) */}
-      <div className="hud-wrap">
         <HudPanel
           grid={grid}
           dollyTile={dollyTile}
@@ -445,11 +563,25 @@ function App() {
           isMoving={isMoving}
           path={path}
           speed={speed}
-          queueLen={queue.length}
+          queueHistory={queueHistory}
         />
-      </div>
+
+      <OrbitHint show={showOrbitHint} />
+
+      <ControlPanel
+        activeView={activeView}
+        onSetActiveView={setActiveView}
+        simCamMode={simCamMode}
+        onSetSimCamMode={handleSetSimCamMode}
+        worldCamMode={worldCamMode}
+        onSetWorldCamMode={setWorldCamMode}
+        showGrid={showGrid}
+        onToggleGrid={() => setShowGrid((v) => !v)}
+      />
+
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   );
 }
 
-export default App
+export default App;
