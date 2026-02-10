@@ -109,11 +109,9 @@ Static perimeter cameras
 Row/column responsibility
 Instant switching for surveillance-style clarity
 
-Optimized for readability and spatial reasoning rather than spectacle.
-
 ---
 
-## What this project demonstrates
+## Project Build Summary
 
 • Data-first modeling
 • Deterministic simulation design
@@ -122,8 +120,6 @@ Optimized for readability and spatial reasoning rather than spectacle.
 • Headless testable architecture
 • Rendering efficiency under real-time constraints
 • Systems thinking under tight timeframes
-
-Not a demo scene — a small, well-structured simulation engine.
 
 ---
 
@@ -140,7 +136,6 @@ Delivers:
 • performant rendering
 • scalable architecture
 
-Structured to scale without rewrites.
 
 ---
 

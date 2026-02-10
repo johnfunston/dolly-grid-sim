@@ -98,7 +98,7 @@ export default function AboutModal({ open, onClose }: AboutModalProps) {
             <h4 className="about-modal__subhead">Pathfinding</h4>
             <p className="about-modal__p">
               Breadth-first search (BFS) for shortest path under uniform edge
-              costs — chosen for correctness + simplicity over heavier heuristics.
+              costs. Chosen for correctness + simplicity over heavier heuristics.
             </p>
 
             <h4 className="about-modal__subhead">Command System</h4>
@@ -141,7 +141,7 @@ export default function AboutModal({ open, onClose }: AboutModalProps) {
             <h4 className="about-modal__subhead">World View</h4>
             <p className="about-modal__p">
               Static perimeter cameras with row/column responsibility and
-              instant switching for surveillance-style clarity — optimized for
+              instant switching for surveillance-style clarity, optimized for
               readability and spatial reasoning rather than spectacle.
             </p>
           </SectionBody>
@@ -149,7 +149,7 @@ export default function AboutModal({ open, onClose }: AboutModalProps) {
       },
       {
         key: "demonstrates",
-        title: "What this project demonstrates",
+        title: "Engineering Constraints",
         body: (
           <SectionBody>
             <ul className="about-modal__list">
@@ -161,9 +161,6 @@ export default function AboutModal({ open, onClose }: AboutModalProps) {
               <li>Render efficiency under real-time constraints</li>
               <li>Scalable structure under time constraints</li>
             </ul>
-            <p className="about-modal__p">
-              Not a demo scene — a small, well-structured simulation engine.
-            </p>
           </SectionBody>
         ),
       },
