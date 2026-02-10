@@ -372,7 +372,7 @@ function App() {
     // Fallback: unknown / unsupported cmd => drop it
     popHead();
     kick();
-  }, [popHead, pushChip, refreshRuntimeGraphs, replaceQueue, resetDoneGuard]);
+  }, [popHead, pushDoneChipIfMissing, pushChip, refreshRuntimeGraphs, replaceQueue, resetDoneGuard]);
 
   useEffect(() => {
     runNextRef.current = runNext;

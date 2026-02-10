@@ -1,6 +1,4 @@
 // src/app/ui/OrbitHint.tsx
-import React from "react";
-
 export default function OrbitHint({ show }: { show: boolean }) {
   if (!show) return null;
 
