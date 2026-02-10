@@ -142,7 +142,7 @@ export default function AboutModal({ open, onClose }: AboutModalProps) {
             <p className="about-modal__p">
               Static perimeter cameras with row/column responsibility and
               instant switching for surveillance-style clarity, optimized for
-              readability and spatial reasoning rather than spectacle.
+              readability and spatial reasoning.
             </p>
           </SectionBody>
         ),
